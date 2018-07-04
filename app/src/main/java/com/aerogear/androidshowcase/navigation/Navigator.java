@@ -21,6 +21,7 @@ import com.aerogear.androidshowcase.features.landing.LandingFragment;
 import com.aerogear.androidshowcase.features.push.PushFragment;
 import com.aerogear.androidshowcase.features.underconstruction.UnderConstructionFragment;
 import com.aerogear.androidshowcase.mvp.views.BaseFragment;
+import com.aerogear.androidshowcase.providers.PushServiceProvider;
 
 import org.aerogear.mobile.auth.AuthService;
 import org.aerogear.mobile.auth.user.UserPrincipal;
@@ -40,6 +41,10 @@ public class Navigator {
     @Inject
     @Nullable
     AuthService authService;
+
+    @Inject
+    @Nullable
+    PushServiceProvider pushServiceProvider;
 
     @Inject
     public Navigator() {
@@ -85,6 +90,10 @@ public class Navigator {
     public void navigateToPushView(MainActivity activity, String title) {
         if (!isConfigured("push")) {
             showNotConfiguredDialog(activity, "push", DocumentUrl.PUSH, title);
+            return;
+        }
+        if (pushServiceProvider != null && pushServiceProvider.getRegistrationException() != null) {
+            showPushRegistrationFailedDialog(activity, "push", pushServiceProvider.getRegistrationException());
             return;
         }
 
@@ -195,6 +204,13 @@ public class Navigator {
 
     }
 
+    private void showPushRegistrationFailedDialog(BaseActivity activity, String friendlyServiceName, Exception registrationException) {
+        PushRegistrationFailedDialogFragment dialog = PushRegistrationFailedDialogFragment.newInstance(registrationException);
+        android.support.v4.app.FragmentManager fm = activity.getSupportFragmentManager();
+        dialog.show(fm, friendlyServiceName);
+
+    }
+
     private void gotoDocs(BaseActivity activity, DocumentUrl docUrl, String title) {
         DocumentationFragment fragment = DocumentationFragment.newInstance(docUrl);
         loadFragment(activity, fragment, docUrl.getUrl(), title);
@@ -217,5 +233,9 @@ public class Navigator {
 
     public void navigateToSSODocumentation(MainActivity mainActivity, String title) {
         gotoDocs(mainActivity, DocumentUrl.IDENTITY_MANAGEMENT_SSO, title);
+    }
+
+    public void navigateToSelfSignedCertificateDocumentation(MainActivity mainActivity, String title) {
+        gotoDocs(mainActivity, DocumentUrl.SELF_SIGNED_DOCS, title);
     }
 }

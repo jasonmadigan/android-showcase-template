@@ -11,8 +11,14 @@ import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.widget.Toolbar;
+import android.text.Spannable;
+import android.text.SpannableString;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
+import android.view.Menu;
 import android.view.MenuItem;
 
+import com.aerogear.androidshowcase.providers.PushServiceProvider;
 import com.aerogear.androidshowcase.features.authentication.AuthenticationDetailsFragment;
 import com.aerogear.androidshowcase.features.authentication.AuthenticationFragment;
 import com.aerogear.androidshowcase.features.authentication.providers.KeycloakAuthenticateProviderImpl;
@@ -22,6 +28,10 @@ import com.aerogear.androidshowcase.navigation.Navigator;
 
 import org.aerogear.mobile.auth.AuthService;
 import org.aerogear.mobile.auth.user.UserPrincipal;
+import org.aerogear.mobile.core.MobileCore;
+import org.aerogear.mobile.core.executor.AppExecutors;
+import org.aerogear.mobile.core.reactive.Requester;
+import org.aerogear.mobile.core.reactive.Responder;
 
 import javax.inject.Inject;
 
@@ -48,6 +58,10 @@ public class MainActivity extends BaseActivity
 
     @Inject
     Navigator navigator;
+
+    @Inject
+    @Nullable
+    PushServiceProvider pushServiceProvider;
 
     @BindView(R.id.toolbar)
     Toolbar toolbar;
@@ -79,13 +93,37 @@ public class MainActivity extends BaseActivity
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.setDrawerListener(toggle);
         toggle.syncState();
+        navigationView.setCheckedItem(R.id.nav_home);
         navigationView.setNavigationItemSelectedListener(this);
+
+        restyleNavigationview();
 
         // initialise the httphelper
         HttpHelper.init();
 
+        if (pushServiceProvider != null) {
+            pushServiceProvider.registerDevice();
+        }
+
+        testNetwork();
         // load the main menu fragment
         navigator.navigateToHomeView(this, getString(R.string.fragment_title_home));
+    }
+
+    private void restyleNavigationview() {
+        Menu m = navigationView.getMenu();
+        for (int i = 0; i < m.size(); i++) {
+            MenuItem item = m.getItem(i);
+            if (item.getIcon() == null) {
+                SpannableString newTitle = new SpannableString("  " + item.getTitle());
+                newTitle.setSpan(new RelativeSizeSpan(.90f), 0 , newTitle.length(),  Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                item.setTitle(newTitle);
+            } else {
+                SpannableString newTitle = new SpannableString(item.getTitle());
+                newTitle.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0 , newTitle.length(),  Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                item.setTitle(newTitle);
+            }
+        }
     }
 
     /**
@@ -206,6 +244,28 @@ public class MainActivity extends BaseActivity
     @Override
     public void onLogoutError(final Exception error) {
 
+    }
+
+    private void testNetwork() {
+        HttpHelper.checkCertificates(this).respondOn(new AppExecutors().mainThread())
+                .respondWith(new Responder<Boolean>() {
+                    @Override
+                    public void onResult(Boolean value) {
+                        if (!value) {
+                            CertificateErrorDialog dialog = new CertificateErrorDialog();
+                            dialog.setGotoDocs(()-> {
+                                navigator.navigateToSelfSignedCertificateDocumentation(MainActivity.this, "Getting Started");
+                                dialog.dismiss();
+                            });
+                            dialog.show(getFragmentManager(), "CERT_ERROR");
+                        }
+                    }
+
+                    @Override
+                    public void onException(Exception exception) {
+
+                    }
+                });
     }
 
 }
